@@ -114,6 +114,35 @@ function createPool(pool, masterContract, oracelContractInstance): Pool {
   return res
 }
 
+async function approveToken(tokenContract, spenderAddress) {
+  try {
+    const estimateGas = await tokenContract.estimateGas.approve(
+      spenderAddress,
+      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    );
+
+    const gasLimit = gasLimitConst + +estimateGas.toString();
+
+    console.log("gasLimit:", gasLimit);
+
+    const tx = await tokenContract.approve(
+      spenderAddress,
+      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      {
+        gasLimit,
+      }
+    );
+    const receipt = await tx.wait();
+
+    console.log("APPROVE RESP:", receipt);
+
+    return true;
+  } catch (e) {
+    console.log("isApprowed err:", e);
+    return false;
+  }
+}
+
 async function cookMultiBorrow(
   { collateralAmount, amount, minExpected },
   isApprowed, pool: Pool
@@ -176,7 +205,7 @@ async function cookMultiBorrow(
     minExpected,
     0,
     {
-      gasLimit: 10000000,
+      gasLimit: 1e7,
     }
   );
   const swapCallByte = swapStaticTx.data.substr(0, 138);
@@ -243,7 +272,7 @@ async function getApprovalEncode(pool: Pool) {
   const account = WALLET;
   const verifyingContract =  '0xd96f48665a1410c0cd669a88898eca36b9fc2cce' // await getVerifyingContract(pool);
   const masterContract = '0x476b1e35dde474cb9aa1f6b85c9cc589bfa85c1f' // await getMasterContract(pool);
-  const nonce = 0 // await getNonce(pool);
+  const nonce = await getNonce(pool);
   const chainId = CHAIN_ID;
   const domain = {
     name: "BentoBox V1",
@@ -440,6 +469,20 @@ async function main() {
   // await cookMultiBorrow(payload, false, pool)
 }
 
+async function isApprowed() {
+  try {
+    const pool =  (pools[0] as Pool)
+    const masterContract = pool.contractInstance.masterContract()
+    const addressApprowed = await pool.masterContractInstance.masterContractApproved(
+      masterContract,
+      WALLET
+    );
+    return addressApprowed;
+  } catch (e) {
+    console.log("isApprowed err:", e);
+  }
+}
+
 main()
 
 // const  maxPairValue = function() {
@@ -502,7 +545,7 @@ function App() {
   }
 
   const go = async () => {
-    const pool = pools[0]
+    const pool: Pool = pools[0]
 
     const l = 0.99 // slipage = 1
     let minExpected: any = mimAmount * oraclePrice * l
@@ -521,7 +564,11 @@ function App() {
     console.log(payload)
 
     //createPayload(2000, 1780.549082, 0.5)
-    const res = await cookMultiBorrow(payload, false, pool)
+
+    await approveToken(pool.token.contract, pool.masterContractInstance.address)
+    const approve = isApprowed()
+
+    const res = await cookMultiBorrow(payload, approve , pool)
 
     setResData(res.datas.join("\n"))
   }
