@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
 
-import { Contract, ethers } from 'ethers'
+import { BigNumber, Contract, ethers } from 'ethers'
 import poolsInfo from './utils/contracts/pool'
 import oracleContractsInfo from "./utils/contracts/oracle";
 import masterContractInfo from "./utils/contracts/master";
 import detectEthereumProvider from "@metamask/detect-provider";
+
 
 
 const gasLimitConst = 1000
@@ -462,7 +463,7 @@ function toFixed(e, t) {
 }
 
 let oraclePrice: number
-let USTValue: number
+let USTValue: any
 
 function App() {
   
@@ -478,17 +479,22 @@ function App() {
     console.log(val)
 
     const ltv = 90
-    oraclePrice = await pools[0].oracelContractInstance.peekSpot(0, {
+
+    const op = await pools[0].oracelContractInstance.peekSpot(0, {
       gasLimit: 3e5
     })
-  
+
+    oraclePrice =+(op + "")
+
+    oraclePrice = oraclePrice / 1e18
+
     console.log(oraclePrice)
     USTValue = +val
     const pairValue = (USTValue / oraclePrice)/100*(ltv-1)*(ltv) / 90
     const mimAmount = multiplyMimExpected(pairValue)
   
-    setPairValue(toFixed(pairValue, 18))
-    setMimAmount(toFixed(mimAmount, 18))
+    setPairValue(toFixed(pairValue, 10))
+    setMimAmount(toFixed(mimAmount, 10))
   }
 
   const go = async () => {
@@ -521,7 +527,7 @@ function App() {
       <header className="App-header">
         <input placeholder="Value" value={ustValue} onChange={(e)=>calc(e.target.value)} ></input>
         <p>MIM: {pairValue}</p>
-        <p>Amount Expected: {mimAmount} </p>
+        <p>Expected MIM amount (6.13x): {mimAmount} </p>
 
         <button onClick={go}>NOTHING TO DO</button>
 
