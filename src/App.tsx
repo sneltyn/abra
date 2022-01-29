@@ -34,6 +34,7 @@ interface Pool {
   contractInstance: Contract,
   masterContractInstance: Contract
   oracelContractInstance: Contract
+  pairTokenContract: Contract
 }
 
 function createPools() {
@@ -94,6 +95,13 @@ function createPool(pool, masterContract, oracelContractInstance): Pool {
     signer
   );
 
+  const pairTokenContract = new ethers.Contract(
+    pool.pairToken.address,
+    JSON.stringify(pool.token.abi),
+    signer
+  );
+
+
   const res: Pool = {
     name: pool.name,
     id: pool.id,
@@ -107,6 +115,7 @@ function createPool(pool, masterContract, oracelContractInstance): Pool {
       decimals: pool.token.decimals
     },
     swapContract: swapContract,
+    pairTokenContract
   }
 
   console.log('id', res.id)
@@ -483,6 +492,29 @@ async function isApprowed() {
   }
 }
 
+
+async function isTokenApprowed(tokenContract, spenderAddress) {
+  try {
+    const addressApprowed = await tokenContract.allowance(
+      this.account,
+      spenderAddress,
+      {
+        gasLimit: 1000000,
+      }
+    );
+
+    console.log(
+      "TOKEN APPROVE:",
+      addressApprowed,
+      parseFloat(addressApprowed.toString()) > 0
+    );
+    return parseFloat(addressApprowed.toString()) > 0;
+  } catch (e) {
+    console.log("isApprowed err:", e);
+    return false;
+  }
+}
+
 main()
 
 // const  maxPairValue = function() {
@@ -565,12 +597,53 @@ function App() {
 
     //createPayload(2000, 1780.549082, 0.5)
 
-    await approveToken(pool.token.contract, pool.masterContractInstance.address)
-    const approve = isApprowed()
 
-    const res = await cookMultiBorrow(payload, approve , pool)
+    let isTokenToCookApprove = await isTokenApprowed(
+      pool.token.contract,
+      pool.masterContractInstance.address
+    );
 
-    setResData(res.datas.join("\n"))
+    if (!isTokenToCookApprove) {
+      isTokenToCookApprove = await approveToken(
+        pool.token.contract,
+        pool.masterContractInstance.address
+      );
+    }
+
+    let isTokenToSwapApprove = await isTokenApprowed(
+      pool.token.contract,
+      pool.swapContract.address
+    );
+
+    if (!isTokenToSwapApprove) {
+      isTokenToSwapApprove = await approveToken(
+        pool.token.contract,
+        pool.swapContract.address
+      );
+    }
+
+    let isPairTokenToSwapApprove = await isTokenApprowed(
+      pool.pairTokenContract,
+      pool.swapContract.address
+    );
+
+    if (!isPairTokenToSwapApprove) {
+      isPairTokenToSwapApprove = await approveToken(
+        pool.pairTokenContract,
+        pool.swapContract.address
+      );
+    }
+
+    const approwed = await isApprowed();
+
+    if (
+      isTokenToCookApprove &&
+      isTokenToSwapApprove &&
+      isPairTokenToSwapApprove
+    ) {
+      const res = await cookMultiBorrow(payload, approwed, pool);
+      setResData(res.datas.join("\n"))
+    }
   }
 
   return (
