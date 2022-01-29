@@ -387,16 +387,20 @@ let pools: any
 
 async function main() {
 
-  const provider = await detectEthereumProvider();
+  // const provider = await detectEthereumProvider();
 
-  const userProvider = new ethers.providers.Web3Provider((window as any).ethereum)
+// Prompt user for account connections
+  
+
+  const userProvider = new ethers.providers.Web3Provider((window as any).ethereum, "any")
+  await userProvider.send("eth_requestAccounts", []);
   signer = userProvider.getSigner()
 
   WALLET = await signer.getAddress()
 
   pools = createPools()
 
-  console.log(provider)
+  // console.log(provider)
   console.log(signer)
   // console.log(WALLET)
 
